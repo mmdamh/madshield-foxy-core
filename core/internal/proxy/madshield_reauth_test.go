@@ -14,7 +14,7 @@ import (
 	"github.com/mmdamh/madshield-foxy-core/core/internal/fxa"
 )
 
-// MadShield (patch 0003): what a renewal does to the account's credentials, against the real account store.
+// MadShield (MadShield CAPTCHA renewal): what a renewal does to the account's credentials, against the real account store.
 
 type renewFixture struct {
 	t     *testing.T

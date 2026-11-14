@@ -14,7 +14,7 @@ import (
 	"github.com/mmdamh/madshield-foxy-core/core/internal/logx"
 )
 
-// MadShield hook (see native/fxvpn/patches): the sign-in of an account whose password the app never sees. The app's
+// MadShield hook: the sign-in of an account whose password the app never sees. The app's
 // browser view shows Mozilla's own sign-in page and hands over the session token the page ends with; this runs the rest
 // like the password sign-in does (the same session registry, the same polling), asking Mozilla for the tokens with
 // fxa.BrowserTokens and storing the account without a password.

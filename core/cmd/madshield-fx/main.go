@@ -1,6 +1,5 @@
-// madshield-fx is the small program MadShield runs for its "Firefox VPN" engine. It is built inside the module of
-// the Foxy core (core/), at the commit in native/fxvpn.pin, because it uses that module's internal
-// packages: CI copies this folder to core/cmd/madshield-fx/ and builds it as a static linux/arm64 ELF.
+// madshield-fx is the small program MadShield runs for its "Firefox VPN" engine. It lives inside the core's module because
+// it uses that module's internal packages; MadShield's CI builds it as a static linux/arm64 ELF.
 //
 // It does what the project's own phone build does (core/mobile/mobile.go), as a separate process instead of a library:
 //
@@ -124,7 +123,7 @@ func run(dataDir string) error {
 	return d.Run()
 }
 
-// limitEgress closes every way out of the core that is not Mozilla's (see the patch in native/fxvpn/patches):
+// limitEgress closes every way out of the core that is not Mozilla's:
 //
 //   - resolver.HostGuard: only Mozilla's names (allow.go) are looked up or connected to, whatever a setting, the server
 //     list or a request to the dashboard asks for;

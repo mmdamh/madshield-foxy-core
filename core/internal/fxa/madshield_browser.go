@@ -20,7 +20,7 @@ import (
 	"github.com/mmdamh/madshield-foxy-core/core/internal/controlplane"
 )
 
-// MadShield hook (see native/fxvpn/patches): the account's tokens for a session the app's browser view signed in.
+// MadShield hook: the account's tokens for a session the app's browser view signed in.
 //
 // Mozilla's edge (Fastly) refuses the "fxa-credentials" grant from many clients with HTTP 406. This file asks for the
 // tokens by every route the account server offers, one at a time, and keeps what each one answered, so a failure says

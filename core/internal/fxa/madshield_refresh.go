@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-// MadShield: the other ways a refresh is sent (patch 0003).
+// MadShield: the other ways a refresh is sent (MadShield CAPTCHA renewal).
 //
 // A refresh the edge answers with HTTP 406 is not always about a missing cookie: the same request can be refused again
 // after any number of solved challenges when what the edge dislikes is the way the request presents itself. Then another

@@ -1,6 +1,6 @@
 package resolver
 
-// MadShield hook (see native/fxvpn/patches): HostGuard, when set, is asked about every NAME the program is about to look
+// MadShield hook: HostGuard, when set, is asked about every NAME the program is about to look
 // up or connect to (not about IP addresses). An error stops the lookup or the dial. MadShield sets it to a list of
 // Mozilla's hosts, so nothing else can be reached by name, whatever the settings, the server list or a dashboard
 // request ask for.

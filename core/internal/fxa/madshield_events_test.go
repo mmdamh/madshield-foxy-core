@@ -17,7 +17,7 @@ import (
 	"github.com/mmdamh/madshield-foxy-core/core/internal/controlplane"
 )
 
-// MadShield (patch 0003): the real RefreshToken -> fxaDo -> solveFastlyChallenge path against a scripted stand-in for
+// MadShield (MadShield CAPTCHA renewal): the real RefreshToken -> fxaDo -> solveFastlyChallenge path against a scripted stand-in for
 // Mozilla's edge (Fastly), reached through the control plane's transport seam. Nothing here touches the network.
 
 const testCaptchaImage = "data:image/png;base64,AQID"

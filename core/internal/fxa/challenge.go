@@ -130,7 +130,7 @@ func solveFastlyChallenge(ctx context.Context) error {
 }
 
 // solveChallengeOnHost runs the flow on one host and reports its start and
-// its end to the observer of ctx (MadShield, patch 0003).
+// its end to the observer of ctx (MadShield, the CAPTCHA renewal).
 func solveChallengeOnHost(ctx context.Context, base string) error {
 	host := strings.TrimPrefix(base, "https://")
 	emitChallenge(ctx, ChallengeEvent{Kind: EvHost, Host: host})

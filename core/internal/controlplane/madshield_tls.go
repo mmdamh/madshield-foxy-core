@@ -10,7 +10,7 @@ import (
 	"github.com/refraction-networking/utls/dicttls"
 )
 
-// MadShield hook (see native/fxvpn/patches): the requests to Mozilla's account and Guardian servers carry a Firefox
+// MadShield hook: the requests to Mozilla's account and Guardian servers carry a Firefox
 // User-Agent, so the TLS under them should look like Firefox's too. Go's own ClientHello does not, and Mozilla's edge
 // (Fastly) answers a client whose hello and User-Agent disagree with HTTP 406. The hello below is the one the data-plane
 // connections already use (package proxy keeps its own copy; it cannot be imported here).

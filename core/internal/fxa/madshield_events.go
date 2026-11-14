@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-// MadShield: what the Fastly challenge flow tells a watcher (patch 0003).
+// MadShield: what the Fastly challenge flow tells a watcher (MadShield CAPTCHA renewal).
 //
 // The flow in challenge.go and fxaDo knows things the caller cannot see from the final error alone: whether Fastly
 // answered a CAPTCHA with a new round, refused the post-back, accepted the cookie on the probe, or answered the original
