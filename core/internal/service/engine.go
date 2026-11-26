@@ -239,6 +239,11 @@ func (d *Daemon) connectEngine(e *proxyEngine) (*proxy.Controller, error) {
 		upstream.Location = proxy.LocationCandidates(countries, country)
 		upstream.Failover = d.failover
 		upstream.Fallback = fallback
+		// The first session is raced: if the selected server does not
+		// connect on this network, other servers of the location (the
+		// recommended location: other locations' too) are tried while it
+		// is still trying, and the first to connect is used.
+		upstream.Race = proxy.RaceCandidates(upstream.Location, fallbackList(fallback), selected, d.failover.Avoided, raceServerCount)
 	}
 	withPass := upstream
 	withPass.Auth, withPass.Pass = auth, pass
@@ -261,6 +266,26 @@ func (d *Daemon) connectEngine(e *proxyEngine) (*proxy.Controller, error) {
 			e.serverSwitched(next)
 		}
 		return nil, fmt.Errorf("establishing upstream proxy session: %w", err)
+	}
+	if won, inLocation := controller.Server(); server == "" && won.Addr != selected.Addr {
+		logx.Info("another server connected before the selected one; using it selected=%s using=%s country=%s in_location=%t",
+			selected.Addr, won.Addr, won.CountryCodeOrUnknown(), inLocation)
+		if !inLocation && !standIn {
+			// The location's own server did not connect while another
+			// location's did: skip it for a while, so that the next wake
+			// does not wait for it again.
+			d.failover.Avoid(selected.Addr)
+		}
+		selected, fromState = won, false
+		upstream.Server = won
+		if proxyURL, err := proxy.NormalizeURL(won.Addr); err == nil {
+			upstream.ProxyURL = proxyURL
+		}
+		if inLocation {
+			selectionSource = "server_race"
+		} else {
+			standIn, selectionSource = true, "server_failover"
+		}
 	}
 	// A stand-in is not saved: the recommended location accepts any
 	// persisted server, and would keep it.
@@ -327,6 +352,10 @@ var recommendedFallbackCountries = []string{"NL", "DE", "BE", "FR", "GB", "AT"}
 // recommended one: a network that cuts every server's connection should
 // not move the upstream around the world.
 const recommendedFallbackLocations = 3
+
+// raceServerCount is how many servers the first session is raced on at most,
+// the selected one included (proxy.RaceCandidates).
+const raceServerCount = 3
 
 // recommendedFallback lists the servers that stand in for the recommended
 // location while its single server keeps failing: those of the country its

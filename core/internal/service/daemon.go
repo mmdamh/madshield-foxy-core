@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -264,6 +265,9 @@ func NewDaemon(paths DataPaths, forceVerbose bool) (*Daemon, error) {
 	}
 	d.signins = newSignInRegistry(d)
 	d.loadSavedLocations()
+	// The handshake shape that connected last starts the next connection,
+	// also after the app restarted the program.
+	proxy.SetUpstreamShapeFile(filepath.Join(paths.Dir, upstreamShapeName))
 	return d, nil
 }
 

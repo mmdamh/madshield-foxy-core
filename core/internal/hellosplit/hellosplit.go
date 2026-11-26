@@ -58,6 +58,9 @@ func current() string {
 	return Off
 }
 
+// Configured is network.hello_split as installed (Off when none was).
+func Configured() string { return current() }
+
 // Wrap returns conn, a new connection about to start TLS, sending its
 // ClientHello in the way chosen. Anything that is not a ClientHello passes
 // untouched.
@@ -67,6 +70,19 @@ func Wrap(conn net.Conn) net.Conn {
 		return conn
 	}
 	return &splitConn{Conn: conn, way: way}
+}
+
+// WrapWith is Wrap for one connection that sends its ClientHello in mode
+// instead of the configured way: the handshake race tries the ways one
+// against another. An empty or unknown mode is the configured way.
+func WrapWith(conn net.Conn, mode string) net.Conn {
+	switch mode {
+	case Off:
+		return conn
+	case SNI, FirstByte, Record:
+		return &splitConn{Conn: conn, way: mode}
+	}
+	return Wrap(conn)
 }
 
 // splitConn splits the ClientHellos written to it.

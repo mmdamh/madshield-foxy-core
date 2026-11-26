@@ -260,3 +260,39 @@ func testCertificate(t *testing.T, name string) (*x509.CertPool, tls.Certificate
 	roots.AddCert(parsed)
 	return roots, tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
 }
+
+// WrapWith picks the way for one connection whatever is configured; an empty
+// way follows the configuration.
+func TestWrapWithOverridesTheConfiguredWay(t *testing.T) {
+	t.Cleanup(func() { Set(Off) })
+	hello := clientHello(t, "example.com")
+	writes := func(conn func(net.Conn) net.Conn) int {
+		rec := &recordingConn{}
+		if _, err := conn(rec).Write(hello); err != nil {
+			t.Fatal(err)
+		}
+		return len(rec.writes)
+	}
+
+	Set(SNI)
+	if n := writes(func(c net.Conn) net.Conn { return WrapWith(c, Off) }); n != 1 {
+		t.Errorf("off: %d writes, want the hello whole", n)
+	}
+	if n := writes(func(c net.Conn) net.Conn { return WrapWith(c, FirstByte) }); n != 2 {
+		t.Errorf("first-byte: %d writes, want 2", n)
+	}
+	if n := writes(func(c net.Conn) net.Conn { return WrapWith(c, Record) }); n != 1 {
+		t.Errorf("record: %d writes, want the two records in one", n)
+	}
+	if n := writes(func(c net.Conn) net.Conn { return WrapWith(c, "") }); n != 3 {
+		t.Errorf("configured (sni): %d writes, want 3", n)
+	}
+
+	Set(Off)
+	if n := writes(func(c net.Conn) net.Conn { return WrapWith(c, SNI) }); n != 3 {
+		t.Errorf("sni while off is configured: %d writes, want 3", n)
+	}
+	if n := writes(func(c net.Conn) net.Conn { return WrapWith(c, "bogus") }); n != 1 {
+		t.Errorf("unknown way: %d writes, want the configured (off) one", n)
+	}
+}

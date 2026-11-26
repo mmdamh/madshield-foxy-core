@@ -3,16 +3,13 @@ package proxy
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -110,57 +107,6 @@ func TestFirefoxHelloMatchesFirefox(t *testing.T) {
 	if got != want {
 		t.Fatalf("hello\n got %+v\nwant %+v", got, want)
 	}
-}
-
-// upstreamTLSServer serves TLS with h2 on a loopback port and trusts it for the
-// test. reject closes the connections it names, before TLS.
-func upstreamTLSServer(t *testing.T, reject func(n int32) bool) (*url.URL, string, *atomic.Int32) {
-	t.Helper()
-	fixture := httptest.NewUnstartedServer(nil)
-	fixture.EnableHTTP2 = true
-	fixture.StartTLS()
-	t.Cleanup(fixture.Close)
-	pool := x509.NewCertPool()
-	pool.AddCert(fixture.Certificate())
-	previous := upstreamRoots.Load()
-	upstreamRoots.Store(pool)
-	t.Cleanup(func() { upstreamRoots.Store(previous); upstreamGoTLS.Store(false) })
-	config := fixture.TLS.Clone()
-	config.NextProtos = []string{"h2"}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = listener.Close() })
-	var count atomic.Int32
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				return
-			}
-			n := count.Add(1)
-			go func() {
-				defer conn.Close()
-				if reject != nil && reject(n) {
-					return
-				}
-				server := tls.Server(conn, config)
-				if server.Handshake() != nil {
-					return
-				}
-				_, _ = io.Copy(io.Discard, server)
-			}()
-		}
-	}()
-	return &url.URL{Scheme: "https", Host: "127.0.0.1"}, listener.Addr().String(), &count
-}
-
-func dialContext(t *testing.T) context.Context {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	t.Cleanup(cancel)
-	return ctx
 }
 
 // Firefox's hello completes TLS on each way the hello can be split, more than

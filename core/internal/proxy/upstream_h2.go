@@ -73,7 +73,13 @@ type h2ProxySession struct {
 }
 
 func newH2ProxySession(proxyURL *url.URL, token string, timeout time.Duration) (*h2ProxySession, error) {
-	session, err := dialH2ProxySession(proxyURL, token, timeout)
+	return newH2ProxySessionContext(context.Background(), proxyURL, token, timeout)
+}
+
+// newH2ProxySessionContext is newH2ProxySession that gives up when ctx is
+// done: the server race cancels the sessions that lost.
+func newH2ProxySessionContext(parent context.Context, proxyURL *url.URL, token string, timeout time.Duration) (*h2ProxySession, error) {
+	session, err := dialH2ProxySessionContext(parent, proxyURL, token, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +90,12 @@ func newH2ProxySession(proxyURL *url.URL, token string, timeout time.Duration) (
 // dialH2ProxySession establishes an HTTP/2 session without logging it; the
 // latency measurement opens one per location.
 func dialH2ProxySession(proxyURL *url.URL, token string, timeout time.Duration) (*h2ProxySession, error) {
+	return dialH2ProxySessionContext(context.Background(), proxyURL, token, timeout)
+}
+
+// dialH2ProxySessionContext is dialH2ProxySession that stops dialing when
+// parent is done (the session it returns does not depend on parent).
+func dialH2ProxySessionContext(parent context.Context, proxyURL *url.URL, token string, timeout time.Duration) (*h2ProxySession, error) {
 	proxyHost := proxyURL.Host
 	if proxyURL.Port() == "" {
 		proxyHost = proxyURL.Hostname() + ":443"
@@ -91,9 +103,9 @@ func dialH2ProxySession(proxyURL *url.URL, token string, timeout time.Duration) 
 
 	// The timeout covers resolving, connecting, and the TLS handshake, as
 	// tls.DialWithDialer did.
-	dialCtx, cancelDial := context.Background(), context.CancelFunc(func() {})
+	dialCtx, cancelDial := parent, context.CancelFunc(func() {})
 	if timeout > 0 {
-		dialCtx, cancelDial = context.WithTimeout(context.Background(), timeout)
+		dialCtx, cancelDial = context.WithTimeout(parent, timeout)
 	}
 	defer cancelDial()
 	proxyTLS, raw, err := dialUpstreamTLS(dialCtx, proxyURL, proxyHost)

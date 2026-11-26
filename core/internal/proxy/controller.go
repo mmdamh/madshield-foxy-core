@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -56,6 +57,10 @@ type ControllerConfig struct {
 	// server to fail over to (the recommended location), asked when the
 	// failover needs them.
 	Fallback func() []Candidate
+	// Race lists servers to open the first session on besides Server, at
+	// once: the first to connect is used (Controller.Server tells which).
+	// Empty: Server only.
+	Race []Candidate
 }
 
 type Controller struct {
@@ -121,29 +126,47 @@ type Controller struct {
 }
 
 func NewController(cfg ControllerConfig) (*Controller, error) {
-	var baseFactory func(target *url.URL, token string) (proxySession, error)
+	var baseDial sessionDialer
 	if cfg.UseH3 {
-		baseFactory = func(target *url.URL, token string) (proxySession, error) {
+		// HTTP/3 sessions cannot be cancelled while dialing: a race's
+		// losers run to their timeout.
+		baseDial = func(_ context.Context, target *url.URL, token string) (proxySession, error) {
 			return newH3ProxySession(target, token, cfg.Timeout)
 		}
 	} else {
-		baseFactory = func(target *url.URL, token string) (proxySession, error) {
-			return newH2ProxySession(target, token, cfg.Timeout)
+		baseDial = func(ctx context.Context, target *url.URL, token string) (proxySession, error) {
+			return newH2ProxySessionContext(ctx, target, token, cfg.Timeout)
 		}
+	}
+	baseFactory := func(target *url.URL, token string) (proxySession, error) {
+		return baseDial(context.Background(), target, token)
 	}
 	sessions := cfg.Sessions
 	if sessions < 1 {
 		sessions = defaultUpstreamConnections
 	}
 	// A pool stays on the server it was made for: after a failover, the
-	// slots it replenishes belong to a session being drained.
-	factory := func(target *url.URL, token string) (proxySession, error) {
+	// slots it replenishes belong to a session being drained. first, when
+	// set, is a session that is already open (the race's winner): it is
+	// the pool's first slot, or the session itself.
+	makeSession := func(target *url.URL, token string, first proxySession) (proxySession, error) {
 		if sessions == 1 {
+			if first != nil {
+				return first, nil
+			}
 			return baseFactory(target, token)
 		}
 		var tokenMu sync.RWMutex
 		createToken := token
+		var firstMu sync.Mutex
 		return newProxySessionPool(sessions, func() (proxySession, error) {
+			firstMu.Lock()
+			opened := first
+			first = nil
+			firstMu.Unlock()
+			if opened != nil {
+				return opened, nil
+			}
 			tokenMu.RLock()
 			currentToken := createToken
 			tokenMu.RUnlock()
@@ -154,16 +177,22 @@ func NewController(cfg ControllerConfig) (*Controller, error) {
 			tokenMu.Unlock()
 		})
 	}
+	factory := func(target *url.URL, token string) (proxySession, error) {
+		return makeSession(target, token, nil)
+	}
 
-	session, err := factory(cfg.ProxyURL, cfg.Pass.RawToken)
+	won, err := raceServers(context.Background(), cfg, baseDial)
 	if err != nil {
 		return nil, err
 	}
-
-	server := cfg.Server
-	if server.Addr == "" {
-		server.Addr = cfg.ProxyURL.Host
+	session, err := makeSession(won.target, cfg.Pass.RawToken, won.session)
+	if err != nil {
+		_ = won.session.Close()
+		return nil, err
 	}
+
+	server := won.server
+	cfg.ProxyURL = won.target
 	controller := &Controller{
 		guardian:       cfg.Guardian,
 		proxyURL:       cfg.ProxyURL,
@@ -463,6 +492,14 @@ func (c *Controller) Reconnect() error {
 	}
 	c.mu.Unlock()
 	return nil
+}
+
+// Server returns the server new sessions are opened to and whether it is
+// one of the location's own (not a stand-in): with Race, the one that
+// connected first.
+func (c *Controller) Server() (Candidate, bool) {
+	server := c.currentServer()
+	return server, inLocation(c.location, server.Addr)
 }
 
 // currentServer returns the server new sessions are opened to.

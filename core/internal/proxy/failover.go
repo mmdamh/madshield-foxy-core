@@ -109,6 +109,25 @@ func (f *ServerFailover) avoidedLocked(key string, now time.Time) bool {
 	return ok
 }
 
+// Avoid skips the server at addr for serverAvoidTime, as if it had failed
+// enough: a connection race found it not connecting while another server
+// was, and the next connection should not wait for it again.
+func (f *ServerFailover) Avoid(addr string) {
+	if f == nil {
+		return
+	}
+	key, err := canonicalProxyAddr(addr)
+	if err != nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.avoided == nil {
+		f.avoided = make(map[string]time.Time)
+	}
+	f.avoided[key] = f.now().Add(serverAvoidTime)
+}
+
 // Worked forgets the strikes of the server at addr: a tunnel opened
 // through it.
 func (f *ServerFailover) Worked(addr string) {

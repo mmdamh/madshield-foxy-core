@@ -22,6 +22,8 @@ const (
 	routingDirName    = "routing"
 	sessionKeyName    = "dashboard.key"
 	serverListName    = "servers.json"
+	// upstreamShapeName keeps the TLS handshake shape that connected last.
+	upstreamShapeName = "upstream_shape.json"
 )
 
 type DataPaths struct {
